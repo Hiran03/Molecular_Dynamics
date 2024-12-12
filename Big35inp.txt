@@ -1,0 +1,94 @@
+
+################################################################## Initialization ###########################################################
+units		real # T - 10e15 s, L - 10e-10 SI units, P - atm, density - g/cm3, mass - g/mol, energy - kcal/mol
+boundary	p p p
+atom_style	full
+log 		log_35equilibration.txt
+
+######################################################################## Styles #############################################################
+special_bonds	amber # to be used when charmm dihedral style is used with non charmm FF
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style	charmm
+pair_style 	lj/cut/coul/long 10.0
+kspace_style 	pppm 1.0e-3
+read_data	Big35.data
+include		settings.txt
+
+######################################################################## Styles #############################################################
+# 1  CT1
+# 2  CT2
+# 3  H1
+# 4  HC
+# 5  HO
+# 6  HW
+# 7  OH
+# 8  OW
+
+group poly 	type 1 2 3 4 5 7
+group water	type 6 8
+
+set	type	1	charge	-0.2
+set	type	2	charge	-0.07
+set	type	7	charge	-0.38
+set	type	5	charge	 0.350
+set	type	8	charge	-0.820
+set	type	6	charge	 0.41
+set	type	3	charge	 0.1
+set	type	4	charge	 0.1
+
+##################################################################### Initial_settings #######################################################
+variable	itr	equal	100000      # No. of iterations
+dump	trajectory	all	dcd	$(v_itr/10)	dump_35equilibration.dcd
+dump	coordinates	all	xyz	$(v_itr/10)	dump_35equilibration.xyz
+velocity	all	create	300.0	4928459 mom yes dist gaussian # If mom = yes, the linear momentum of the newly created ensemble of velocities is zeroed
+compute	c1	all	gyration	# Radius of gyration
+thermo_style	custom    step    pe	temp	press	density   c_c1
+thermo $(v_itr/10)
+
+####################################################################### Minimisation #########################################################
+thermo		100
+min_style cg
+minimize 1.0e-5 1.0e-5 1000 1000
+thermo $(v_itr/10)
+
+
+############################################################################ NPT #############################################################
+print "NPT Pstart: 1, Pstop: 1 for $(v_itr) iterations"
+fix	Ef	all	npt	temp	300	300	50	iso	1	1	1000	drag	0.2	
+run	$(v_itr)
+unfix	Ef	
+
+write_restart	35equilibrated_structure	# Saving eqilibrated structure							
+undump    trajectory
+undump    coordinates
+
+
+##################################################################### Initial_settings #######################################################
+#read_restart	35equilibrated_structure
+log 		log_35tension.txt
+dump	trajectory1	all	dcd	$(v_itr/10)	dump_35tension.dcd
+compute		stress		all		pressure	thermo_temp 		          # Calculates the stress tensor
+thermo_style	custom    step    temp	lx ly lz	pxx pyy pzz pxy pxz pyz
+thermo $(v_itr/100)
+print "Loading equilibrated structure..."
+
+############################################################################ NVT #############################################################
+print "NVT Tstart: 300, Tstop: 300 for $(v_itr/10) iterations"
+fix	ET	all	nvt	temp	300	300	500
+run	$(v_itr/10)
+unfix	ET	
+variable	z_initial_dynamic	equal	lz
+variable	z_initial_static	equal	${z_initial_dynamic}
+
+
+########################################################################## Tensile ############################################################
+print "Tensile test: Max 100% deformation - Strain rate = $((1*v_z_initial_static/v_itr)/(v_z_initial_static*(10^-15)))"
+fix	T1	all	deform		1	z	vel	$(1*v_z_initial_static/v_itr)     # Every time step z deforms by $() = total 100%	
+fix	T2	all	npt temp 300.0 300.0 100.0	x 1 1 150.0       y 1 1 150.0	drag 0.2  # Maintaining 0 pressure in other directions.				
+run	$(v_itr)						
+unfix T1
+unfix T2
+						
+undump    trajectory1
+print "All done"
