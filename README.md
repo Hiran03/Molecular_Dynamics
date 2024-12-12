@@ -4,3 +4,11 @@ Molecular Dynamics (MD) is a computational simulation technique employed in vari
 
 Our objective encompasses conducting a tensile test under a constant strain rate through molecular dynamics simulation using LAMMPS, generating stress-strain plots for hydrated PVA. 
 
+Model - PVA is a linear polymer with the formula [CH2CH(OH)]n. Using Materials Studio 2020, polymeric chains of length n were constructed. Packmol facilitated the packing of 20 such chains along with 35% (by weight) of water molecule
+
+**File Specifications**
+
+1. report - A detailed report of the entire project.
+2. settings - Conntains all the ForceField parameters
+3. Big35.data - Lammps data file specifying the coordinates of each atom in the system read from the PDB file generated earlier.
+4. Big#5.inp - Lammps input file to perform equilibration and tensile test. THe outputs will be saved as a log file.
